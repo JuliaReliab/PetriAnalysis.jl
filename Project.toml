@@ -1,0 +1,21 @@
+name = "PetriAnalysis"
+uuid = "829c5846-c182-4980-9194-342f6997dcff"
+version = "0.2.0"
+authors = ["Hiroyuki Okamura <okamu@hiroshima-u.ac.jp> and contributors"]
+
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+PetriStructure = "7f65ebd1-fc8e-474c-8d71-50405f87cf65"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+
+[sources]
+PetriStructure = { path = "../PetriStructure.jl" }
+
+[compat]
+julia = "1.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
