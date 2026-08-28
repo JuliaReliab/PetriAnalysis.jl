@@ -40,12 +40,21 @@ Four source files:
 
 - **`reachability.jl`** — `reachability_graph(pn)` runs a depth-first search from
   `initial(pn)`, interning markings in a `Dict{Vector{Int},Int}` (Julia hashes
-  vectors by value — simpler than gospn's string keys). Each marking is
+  vectors by value, so no separate key has to be built). Each marking is
   classified into the `@enum StateType` (`VANISHING` / `TANGIBLE` / `ABSORBING`),
   its GenVec (`@enum GenStatus` per general transition, via `gen_status`) is
   recorded, and every firing is a `MarkEdge` (`:imm` / `:exp` / `:gen`). The search
-  **reuses PetriStructure's token game** (`enablefunc`, `firingfunc`) and fires
+  **reuses PetriStructure's token game** (`isenabled`, `fire`) and fires
   immediate, exponential **and** general transitions. Result is a `MarkingGraph`.
+
+  The loop is written to allocate as little as it can, because it runs per
+  transition per marking: `isenabled`/`fire` rather than
+  `enablefunc`/`firingfunc`, which build a closure per call; the enabled
+  transitions are **visited, not collected** (`filter` allocated an array and a
+  closure at every state); and a GenVec is built only for a net that has general
+  transitions, so an SPN or GSPN does not allocate an empty vector per marking.
+  Keep it that way — see the typing design point in `PetriStructure.jl/CLAUDE.md`,
+  which is where most of the cost used to be.
 
 - **`generator.jl`** — SPN/GSPN path. `exp_rate_matrix` (timed rates) and
   `imm_prob_matrix` (weight-normalised immediate branches) are the building
@@ -95,5 +104,5 @@ Four source files:
 
 ## Dependencies
 
-- `PetriStructure` — net types and the `enablefunc`/`firingfunc` token game
+- `PetriStructure` (≥ 1.3) — net types and the `isenabled`/`fire` token game
 - `SparseArrays`, `LinearAlgebra` (stdlib) — matrices and the elimination solve
