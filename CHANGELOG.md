@@ -1,3 +1,19 @@
+# PetriAnalysis 0.2.1
+
+- `reachability_graph` is substantially faster and allocates less: about 6x the
+  speed and a third of the memory on a closed ring net of 38,760 states, mostly
+  from the concrete types added in PetriStructure 1.3.0. It now also
+  - calls `isenabled`/`fire` instead of `enablefunc`/`firingfunc`, which built a
+    closure per transition per marking;
+  - visits the enabled transitions instead of collecting them with `filter`,
+    which allocated an array and a closure at every state;
+  - skips building a GenVec for a net with no general transitions, rather than
+    allocating an empty vector per marking.
+  The marking graph, generator and MRSPN blocks are unchanged.
+- Declare `[compat]` for `PetriStructure`, `SparseArrays` and `LinearAlgebra`.
+  Only `julia` was bounded, so nothing recorded which versions of the
+  dependencies this package is known to work with.
+
 # PetriAnalysis 0.2.0
 
 - **MRSPN support.** `reachability_graph` is now GEN-aware: it fires general

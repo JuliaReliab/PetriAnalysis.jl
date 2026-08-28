@@ -1,6 +1,6 @@
 name = "PetriAnalysis"
 uuid = "829c5846-c182-4980-9194-342f6997dcff"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Hiroyuki Okamura <okamu@hiroshima-u.ac.jp> and contributors"]
 
 [deps]
@@ -12,6 +12,9 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 PetriStructure = { path = "../PetriStructure.jl" }
 
 [compat]
+LinearAlgebra = "1"
+PetriStructure = "1.3"   # isenabled/fire
+SparseArrays = "1"
 julia = "1.10"
 
 [extras]
