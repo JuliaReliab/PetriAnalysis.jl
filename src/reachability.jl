@@ -126,7 +126,10 @@ function reachability_graph(pn::PN; maxstates::Int = 10_000_000)
         return i, true
     end
 
-    enabled(tr, m) = enablefunc(pn, tr)(m)
+    # isenabled/fire rather than enablefunc/firingfunc: the *func forms build a
+    # closure per call, and the search calls them for every transition of every
+    # marking.
+    enabled(tr, m) = isenabled(pn, tr, m)
     indomain(m) = all(mmin[k] <= m[k] <= mmax[k] for k in eachindex(m))
 
     i0, _ = intern!(copy(m0))
@@ -134,40 +137,46 @@ function reachability_graph(pn::PN; maxstates::Int = 10_000_000)
     while !isempty(stack)
         i = pop!(stack)
         m = states[i]
-        genvecs[i] = [gen_status(tr, m) for tr in pn.gentrans]
+        # Only nets with general transitions need a GenVec; for an SPN or GSPN this
+        # would otherwise allocate an empty vector for every marking.
+        if !isempty(pn.gentrans)
+            genvecs[i] = [gen_status(tr, m) for tr in pn.gentrans]
+        end
 
-        en_imm = filter(tr -> enabled(tr, m), pn.immtrans)
-        if !isempty(en_imm)
+        # The enabled transitions are visited rather than collected: `filter`
+        # allocated a fresh array, and a closure over the marking, at every state.
+        anyimm = false
+        for tr in pn.immtrans
+            enabled(tr, m) || continue
+            anyimm = true
             types[i] = VANISHING
-            for tr in en_imm
-                m2 = firingfunc(pn, tr)(m)
+            m2 = fire(pn, tr, m)
+            indomain(m2) || continue
+            j, isnew = intern!(m2)
+            isnew && push!(stack, j)
+            push!(edges, MarkEdge(i, j, tr.id, :imm, tr.weight))
+        end
+        if !anyimm
+            anytimed = false
+            for tr in pn.exptrans
+                enabled(tr, m) || continue
+                anytimed = true
+                m2 = fire(pn, tr, m)
                 indomain(m2) || continue
                 j, isnew = intern!(m2)
                 isnew && push!(stack, j)
-                push!(edges, MarkEdge(i, j, tr.id, :imm, tr.weight))
+                push!(edges, MarkEdge(i, j, tr.id, :exp, tr.rate))
             end
-        else
-            en_exp = filter(tr -> enabled(tr, m), pn.exptrans)
-            en_gen = filter(tr -> gen_status(tr, m) == GENABLE, pn.gentrans)
-            if !isempty(en_exp) || !isempty(en_gen)
-                types[i] = TANGIBLE
-                for tr in en_exp
-                    m2 = firingfunc(pn, tr)(m)
-                    indomain(m2) || continue
-                    j, isnew = intern!(m2)
-                    isnew && push!(stack, j)
-                    push!(edges, MarkEdge(i, j, tr.id, :exp, tr.rate))
-                end
-                for tr in en_gen
-                    m2 = firingfunc(pn, tr)(m)
-                    indomain(m2) || continue
-                    j, isnew = intern!(m2)
-                    isnew && push!(stack, j)
-                    push!(edges, MarkEdge(i, j, tr.id, :gen, 1.0))
-                end
-            else
-                types[i] = ABSORBING
+            for tr in pn.gentrans
+                gen_status(tr, m) == GENABLE || continue
+                anytimed = true
+                m2 = fire(pn, tr, m)
+                indomain(m2) || continue
+                j, isnew = intern!(m2)
+                isnew && push!(stack, j)
+                push!(edges, MarkEdge(i, j, tr.id, :gen, 1.0))
             end
+            types[i] = anytimed ? TANGIBLE : ABSORBING
         end
 
         length(states) > maxstates && error(
