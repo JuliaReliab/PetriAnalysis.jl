@@ -1,0 +1,42 @@
+/*
+  SPNP Example 1: M.K. Molloy's IEEE TC
+  (M. K. Molloy, Performance analysis using stochastic Petri nets, IEEE Trans. Comput., C-31 (9), 913-917, 1982)
+*/
+
+place p0 (init = 3)
+place p1
+place p2
+place p3
+place p4
+
+exp t0 (rate = t0.rate)
+exp t1 (rate = t1.rate)
+exp t2 (rate = t2.rate)
+exp t3 (rate = t3.rate)
+exp t4 (rate = t4.rate)
+
+iarc p0 to t0
+iarc p1 to t1
+iarc p2 to t2
+iarc p3 to t3
+iarc p3 to t4
+iarc p4 to t4
+
+oarc t0 to p1
+oarc t0 to p2
+oarc t1 to p3
+oarc t2 to p4
+oarc t3 to p1
+oarc t4 to p0
+
+t0.rate = 1
+t1.rate = 3
+t2.rate = 7
+t3.rate = 9
+t4.rate = 5
+
+reward ef0 #p0
+reward ef1 #p1
+reward ef2 ifelse(?t2, t2.rate, 0)
+reward ef3 ifelse(?t3, t3.rate, 0)
+reward eff ifelse(?t1, t1.rate, 0) * 1.8 + #p3 * 0.7
