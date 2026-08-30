@@ -1,0 +1,19 @@
+/*
+  MRSPN crosscheck fixture: GEN -> vanishing (IMM) -> EXP -> back, which is what
+  exercises the immediate blocks. The Julia side is gen_imm_exp().
+*/
+
+place a (init = 1)
+place b
+place c
+
+gen Tg (dist = det(1.0))
+imm Ti (weight = 1.0)
+exp Te (rate = 1.0)
+
+arc a to Tg
+arc Tg to b
+arc b to Ti
+arc Ti to c
+arc c to Te
+arc Te to a

@@ -1,0 +1,15 @@
+/*
+  MRSPN crosscheck fixture: the textbook failure / deterministic repair.
+  The Julia side is fail_repair() in test/test_mrspn.jl.
+*/
+
+place up (init = 1)
+place down
+
+exp Tfail (rate = 0.1)
+gen Trepair (dist = det(5.0))
+
+arc up to Tfail
+arc Tfail to down
+arc down to Trepair
+arc Trepair to up
