@@ -128,18 +128,34 @@ end
 # gospn labels a group G0/I0/A0 and names a block <src><dest><kind>, where kind is "E",
 # "I" or "P<k>".
 #
-# Two things the block matrices alone cannot say, and which gospn's result file does not
-# record either:
-#
-#   - which general transition P<k> is. The k is a counter over the general transitions
-#     in the order their blocks were found, so the fixtures here have exactly one, where
-#     P0 is unambiguous.
-#   - the distribution governing each group's sojourn. A gen block is a 0/1 jump matrix,
-#     so changing Trepair from det(5) to det(99) leaves every matrix in the file
-#     identical -- this test was checked, and it does not fail on that.
-#
-# So this compares the *structure* of the regenerative process, which is what the file
-# holds. An MRP solved from the file needs the distributions from somewhere else.
+# The block matrices alone cannot say which general transition a P<k> block is, nor what
+# distribution governs a group: a gen block is a 0/1 jump matrix, so changing det(5) to
+# det(99) leaves every matrix identical. gospn 0.22.0 added two text elements for exactly
+# that -- `gentrans` and `groupgen` -- and they are checked here too. Before them this
+# test could compare every block and still miss a wrong distribution; it was the reason
+# they exist.
+
+# gentrans is "P<k>\t<transition>\t<distribution>" per line.
+gospn_gentrans(z) = Dict(p[1] => (p[2], p[3]) for p in
+    (split(l, "\t") for l in split(String(z["gentrans"]), "\n")))
+
+# groupgen is "<group>\t<transition>\t<status>\t<distribution>" per line; status is E
+# for aging and P for preempted.
+function gospn_groupgen(z)
+    out = Dict{String,Vector{Tuple{String,String,String}}}()
+    haskey(z, "groupgen") || return out
+    for l in split(String(z["groupgen"]), "\n")
+        g, tr, st, dist = split(l, "\t")
+        push!(get!(out, String(g), Tuple{String,String,String}[]), (String(tr), String(st), String(dist)))
+    end
+    out
+end
+
+# The same rendering gospn uses, so the two can be compared as strings.
+gospn_dist(d::DetDist) = "det(" * fmtnum(d.value) * ")"
+gospn_dist(d::UnifDist) = "unif(" * fmtnum(d.a) * "," * fmtnum(d.b) * ")"
+gospn_dist(d::ExpDist) = "expdist(" * fmtnum(d.rate) * ")"
+fmtnum(x::Float64) = isinteger(x) ? string(Int(x)) : string(x)
 gospn_groups(z) = sort([k[5:end] for k in keys(z) if startswith(k, "mark")])
 
 # Match gospn's groups to ours by the set of markings they hold: neither the group order
@@ -184,8 +200,18 @@ function check_mrspn(name, npz, pn)
         an = mrspn(pn)
         m = match_groups(z, an, pn)
         @test length(m) == ngroups(an)
-        @test length(pn.gentrans) == 1          # P0 is only unambiguous with one
-        trid = pn.gentrans[1].id
+
+        # Which transition each P<k> is, and with which distribution. Without the
+        # gentrans element a net with two general transitions could not be checked at
+        # all -- P0 is Trebuild in raid6.spn and Trecon in raid10.spn.
+        gt = gospn_gentrans(z)
+        byname = Dict(t.label => t for t in pn.gentrans)
+        @test Set(keys(gt)) ⊆ Set("P" * string(k) for k in 0:length(pn.gentrans)-1)
+        for (_, (label, dist)) in gt
+            @test haskey(byname, label)
+            @test dist == gospn_dist(byname[label].dist)
+        end
+        kinds = vcat("E", "I", collect(keys(gt)))
 
         # Every block gospn wrote must be one this loop actually looks at. Without
         # this the test passes when a name is wrong on both sides at once: an absent
@@ -195,14 +221,28 @@ function check_mrspn(name, npz, pn)
 
         for src in keys(m), dst in keys(m)
             i, j = m[src][1], m[dst][1]
-            for kind in ("E", "I", "P0")
+            for kind in kinds
                 push!(visited, src * dst * kind)
             end
             @test gospn_block(z, an, m, src, dst, "E") ≈ Matrix(exp_block(an, i, j)) rtol = 1e-12
             @test gospn_block(z, an, m, src, dst, "I") ≈ Matrix(imm_block(an, i, j)) rtol = 1e-12
-            @test gospn_block(z, an, m, src, dst, "P0") ≈ Matrix(gen_block(an, i, j, trid)) rtol = 1e-12
+            for (pk, (label, _)) in gt
+                trid = byname[label].id
+                @test gospn_block(z, an, m, src, dst, pk) ≈ Matrix(gen_block(an, i, j, trid)) rtol = 1e-12
+            end
         end
         @test isempty(setdiff(written, visited))
+
+        # Which general transitions govern each group. active_gens returns the aging
+        # ones; gospn also reports the preempted ones, which is more than we model.
+        gg = gospn_groupgen(z)
+        for (label, (gid, _)) in m
+            theirs = sort([tr for (tr, st, _) in get(gg, label, []) if st == "E"])
+            @test theirs == sort([t.label for t in active_gens(an, gid)])
+            for (tr, _, dist) in get(gg, label, [])
+                @test dist == gospn_dist(byname[tr].dist)
+            end
+        end
 
         # And the initial marking is the same one, not merely a marking of some group.
         ours = initial_vectors(an)
@@ -215,3 +255,18 @@ end
 check_mrspn("fail/repair", "mrspn_fail_repair.npz", fail_repair())
 check_mrspn("subordinated group", "mrspn_subordinated.npz", subordinated_pair())
 check_mrspn("gen -> imm -> exp", "mrspn_gen_imm_exp.npz", gen_imm_exp())
+
+# Two independent general transitions with different distributions: the P<k> numbering
+# has something to get wrong, and the groups cover several GenVec combinations.
+function two_gen()
+    pn = petri()
+    a1 = place(pn, "a1", 1, 1); b1 = place(pn, "b1", 0, 1)
+    a2 = place(pn, "a2", 1, 1); b2 = place(pn, "b2", 0, 1)
+    T1 = gentrans(pn, "T1", detdist(1.0))
+    T2 = gentrans(pn, "T2", unifdist(2.0, 4.0))
+    arc(pn, a1, T1); arc(pn, T1, b1)
+    arc(pn, a2, T2); arc(pn, T2, b2)
+    pn
+end
+
+check_mrspn("two general transitions", "mrspn_two_gen.npz", two_gen())
