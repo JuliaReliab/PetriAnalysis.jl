@@ -14,6 +14,11 @@ marking-dependent rates (`#Pn * lambda`), and `PetriStructure.jl` takes a consta
 so neither can be transcribed. Each `mrspn_*.spn` is the same net as the builder of the
 matching name in `test_mrspn.jl`.
 
+`spnp_example2_tangible.npz` is the same net through `gospn mark -t`, which runs a
+different search: it vanishes the immediate markings during the reachability walk rather
+than leaving them for the elimination. Fewer states reach the file (10 rather than 11,
+and no `I0I0I` block), and the generator over the tangible markings must be the same.
+
 The `mrspn_*.npz` were produced with **gospn 0.22.0 or later**, which is the first that
 writes `gentrans` and `groupgen` — which general transition each `P<k>` block is, and
 what governs each group. Without them a wrong distribution is invisible: a general block

@@ -42,6 +42,12 @@ function rowperm(theirs, places, ours, ourplaces)
     [index[m] for m in ours]
 end
 
+# The rows of a mark<G> matrix as marking vectors in our place order.
+function gospn_markings(theirs, places, ourplaces)
+    col = Dict(p => i for (i, p) in enumerate(ourplaces))
+    [[Int(theirs[k, findfirst(==(p), places)]) for p in ourplaces] for k in axes(theirs, 1)]
+end
+
 @testset "gospn crosscheck: SPN generator (spnp_example1)" begin
     # The same net as test/data/spnp_example1.spn, by hand.
     pn = @petrinet begin
@@ -74,10 +80,10 @@ end
     @test findfirst(!iszero, z["initG0"][perm]) == findfirst(==(mg.initial_state), st)
 end
 
-@testset "gospn crosscheck: GSPN generator (spnp_example2)" begin
-    # test/data/spnp_example2.spn. All five IMM transitions share one priority there,
-    # which is what makes this net expressible here: PetriStructure has no priorities.
-    pn = @petrinet begin
+# The net of test/data/spnp_example2.spn, by hand. All five of its IMM transitions
+# share one priority, which is what makes it expressible here: PetriStructure has none.
+function spnp_example2()
+    @petrinet begin
         p0[1]; p1[0]; p2[0]; p3[0]; p4[0]; p5[0]; p6[0]; p7[0]; p8[0]
         exp(1.0): A
         exp(0.3): B1
@@ -98,30 +104,63 @@ end
         p7 => t7; t7 => p5
         p2 => t8; p6 => t8; t8 => p8
     end
-
-    mg = reachability_graph(pn)
-    Q, st = generator(mg; tangible = true)
-
-    z = npzread(joinpath(datadir, "spnp_example2.npz"))
-
-    # gospn keeps the groups apart: tangible (G0), vanishing (I0) and absorbing (A0).
-    # Eliminating the vanishing states is the same computation generator() performs,
-    # written over gospn's blocks -- which is the point: the two arrive here by
-    # different routes.
-    nG, nI, nA = size(z["markG0"], 1), size(z["markI0"], 1), size(z["markA0"], 1)
-    QTT = blockdiag(gospn_sparse(z, "G0G0E"), spzeros(nA, nA))
-    RTV = vcat(gospn_sparse(z, "G0I0E"), spzeros(nA, nI))
-    PVV = gospn_sparse(z, "I0I0I")
-    PVT = hcat(gospn_sparse(z, "I0G0I"), gospn_sparse(z, "I0A0I"))
-    G = QTT + RTV * ((I - PVV) \ Matrix(PVT))
-
-    @test size(G) == size(Q)
-    @test all(abs.(vec(sum(G, dims = 2))) .< 1e-12)     # still a generator
-
-    perm = rowperm(vcat(z["markG0"], z["markA0"]), gospn_places(z),
-        [mg.states[i] for i in st], [p.label for p in pn.places])
-    @test Matrix(Q) ≈ G[perm, perm] rtol = 1e-12
 end
+
+# A block gospn wrote, or a zero matrix of the right size when it wrote none. Which
+# blocks exist depends on the net *and* on the search: `mark -t` vanishes immediate
+# markings as it goes, so its file has no I0I0I and gains a direct G0A0E.
+blockOrZero(z, name, r, c) =
+    haskey(z, name * ".shape") ? Matrix(gospn_sparse(z, name)) : zeros(r, c)
+
+# The generator over the tangible markings, assembled from gospn's blocks by eliminating
+# the vanishing ones: Q_TT + R_TV (I - P_VV)^-1 P_VT. This is the same computation
+# generator() performs, written over the file -- which is the point, the two reach it by
+# different routes. Rows are G0 then A0.
+function gospn_tangible_generator(z)
+    nG, nA = size(z["markG0"], 1), size(z["markA0"], 1)
+    nI = haskey(z, "markI0") ? size(z["markI0"], 1) : 0
+    QTT = [blockOrZero(z, "G0G0E", nG, nG) blockOrZero(z, "G0A0E", nG, nA)
+           blockOrZero(z, "A0G0E", nA, nG) blockOrZero(z, "A0A0E", nA, nA)]
+    nI == 0 && return QTT
+    RTV = vcat(blockOrZero(z, "G0I0E", nG, nI), blockOrZero(z, "A0I0E", nA, nI))
+    PVV = blockOrZero(z, "I0I0I", nI, nI)
+    PVT = hcat(blockOrZero(z, "I0G0I", nI, nG), blockOrZero(z, "I0A0I", nI, nA))
+    QTT + RTV * ((I - PVV) \ PVT)
+end
+
+# The tangible markings of a gospn file, in the row order of the assembled generator.
+gospn_tangible_marks(z, places, ourplaces) =
+    vcat(gospn_markings(z["markG0"], places, ourplaces),
+         gospn_markings(z["markA0"], places, ourplaces))
+
+function check_gspn_generator(name, npz, pn)
+    @testset "gospn crosscheck: GSPN generator ($name)" begin
+        mg = reachability_graph(pn)
+        Q, st = generator(mg; tangible = true)
+        z = npzread(joinpath(datadir, npz))
+
+        G = gospn_tangible_generator(z)
+        @test size(G) == size(Q)
+        @test all(abs.(vec(sum(G, dims = 2))) .< 1e-12)     # still a generator
+
+        ourplaces = [p.label for p in pn.places]
+        theirs = gospn_tangible_marks(z, gospn_places(z), ourplaces)
+        ours = [mg.states[i] for i in st]
+        index = Dict(m => k for (k, m) in enumerate(theirs))
+        @assert length(index) == length(theirs) "gospn markings are not distinct"
+        perm = [index[m] for m in ours]
+
+        @test Matrix(Q) ≈ G[perm, perm] rtol = 1e-12
+    end
+end
+
+check_gspn_generator("spnp_example2", "spnp_example2.npz", spnp_example2())
+
+# The same net through `gospn mark -t`, which runs a different search: it vanishes the
+# immediate markings during the reachability walk rather than leaving them for the
+# elimination. Fewer states reach the file -- 10 rather than 11, and no I0I0I block --
+# and the generator over the tangible markings has to be the same one.
+check_gspn_generator("spnp_example2 via mark -t", "spnp_example2_tangible.npz", spnp_example2())
 
 # -- MRSPN --------------------------------------------------------------------
 
@@ -174,12 +213,6 @@ function match_groups(z, an, pn)
         out[label] = (gid, rowperm(theirs, places, group_markings(an, gid), ourplaces))
     end
     out
-end
-
-# The rows of a mark<G> matrix as marking vectors in our place order.
-function gospn_markings(theirs, places, ourplaces)
-    col = Dict(p => i for (i, p) in enumerate(ourplaces))
-    [[Int(theirs[k, findfirst(==(p), places)]) for p in ourplaces] for k in axes(theirs, 1)]
 end
 
 # The block gospn wrote for this pair, or a zero matrix when it wrote none -- an absent

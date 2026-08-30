@@ -1,6 +1,6 @@
 name = "PetriAnalysis"
 uuid = "829c5846-c182-4980-9194-342f6997dcff"
-version = "0.2.4"
+version = "0.2.5"
 authors = ["Hiroyuki Okamura <okamu@hiroshima-u.ac.jp> and contributors"]
 
 [deps]
