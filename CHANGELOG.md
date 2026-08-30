@@ -1,3 +1,15 @@
+# PetriAnalysis 0.2.5
+
+- **`gospn mark -t` is crosschecked too.** That flag runs a different search on gospn's
+  side -- it vanishes the immediate markings during the reachability walk rather than
+  leaving them for the elimination -- so it reaches the generator by a third route.
+  `spnp_example2` is now compared from both files, and the assembly was generalised for
+  it: which blocks a file contains depends on the search (`-t` has no `I0I0I` and gains
+  a direct `G0A0E`), so blocks are read as present-or-zero rather than by a fixed list.
+
+  All three agree to 1e-12: gospn's plain output, gospn's `-t` output, and this
+  package's own elimination. Perturbing a rate fails both gospn comparisons.
+
 # PetriAnalysis 0.2.4
 
 - **The MRSPN crosscheck now covers the distributions, not just the block structure.**
