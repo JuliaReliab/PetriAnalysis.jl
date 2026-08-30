@@ -122,3 +122,96 @@ end
         [mg.states[i] for i in st], [p.label for p in pn.places])
     @test Matrix(Q) ≈ G[perm, perm] rtol = 1e-12
 end
+
+# -- MRSPN --------------------------------------------------------------------
+
+# gospn labels a group G0/I0/A0 and names a block <src><dest><kind>, where kind is "E",
+# "I" or "P<k>".
+#
+# Two things the block matrices alone cannot say, and which gospn's result file does not
+# record either:
+#
+#   - which general transition P<k> is. The k is a counter over the general transitions
+#     in the order their blocks were found, so the fixtures here have exactly one, where
+#     P0 is unambiguous.
+#   - the distribution governing each group's sojourn. A gen block is a 0/1 jump matrix,
+#     so changing Trepair from det(5) to det(99) leaves every matrix in the file
+#     identical -- this test was checked, and it does not fail on that.
+#
+# So this compares the *structure* of the regenerative process, which is what the file
+# holds. An MRP solved from the file needs the distributions from somewhere else.
+gospn_groups(z) = sort([k[5:end] for k in keys(z) if startswith(k, "mark")])
+
+# Match gospn's groups to ours by the set of markings they hold: neither the group order
+# nor the marking order agrees between the two, and nothing else identifies a group.
+# Returns gospn label -> (our group id, our-row -> gospn-row permutation).
+function match_groups(z, an, pn)
+    ourplaces = [p.label for p in pn.places]
+    places = gospn_places(z)
+    out = Dict{String,Tuple{Int,Vector{Int}}}()
+    for label in gospn_groups(z)
+        theirs = z["mark"*label]
+        gid = findfirst(g -> Set(group_markings(an, g)) ==
+                             Set(gospn_markings(theirs, places, ourplaces)),
+                        1:ngroups(an))
+        @assert gid !== nothing "no group of ours holds the markings of gospn's $label"
+        out[label] = (gid, rowperm(theirs, places, group_markings(an, gid), ourplaces))
+    end
+    out
+end
+
+# The rows of a mark<G> matrix as marking vectors in our place order.
+function gospn_markings(theirs, places, ourplaces)
+    col = Dict(p => i for (i, p) in enumerate(ourplaces))
+    [[Int(theirs[k, findfirst(==(p), places)]) for p in ourplaces] for k in axes(theirs, 1)]
+end
+
+# The block gospn wrote for this pair, or a zero matrix when it wrote none -- an absent
+# block and an all-zero block mean the same thing, and the two sides disagree about
+# which of them to store.
+function gospn_block(z, an, m, src, dst, kind)
+    (i, pi), (j, pj) = m[src], m[dst]
+    name = src * dst * kind
+    if !haskey(z, name * ".shape")
+        return zeros(length(an.groups[i].marks), length(an.groups[j].marks))
+    end
+    Matrix(gospn_sparse(z, name))[pi, pj]
+end
+
+function check_mrspn(name, npz, pn)
+    @testset "gospn crosscheck: MRSPN blocks ($name)" begin
+        z = npzread(joinpath(datadir, npz))
+        an = mrspn(pn)
+        m = match_groups(z, an, pn)
+        @test length(m) == ngroups(an)
+        @test length(pn.gentrans) == 1          # P0 is only unambiguous with one
+        trid = pn.gentrans[1].id
+
+        # Every block gospn wrote must be one this loop actually looks at. Without
+        # this the test passes when a name is wrong on both sides at once: an absent
+        # block reads as zero, and zero equals zero.
+        written = Set(k[1:end-6] for k in keys(z) if endswith(k, ".shape"))
+        visited = Set{String}()
+
+        for src in keys(m), dst in keys(m)
+            i, j = m[src][1], m[dst][1]
+            for kind in ("E", "I", "P0")
+                push!(visited, src * dst * kind)
+            end
+            @test gospn_block(z, an, m, src, dst, "E") ≈ Matrix(exp_block(an, i, j)) rtol = 1e-12
+            @test gospn_block(z, an, m, src, dst, "I") ≈ Matrix(imm_block(an, i, j)) rtol = 1e-12
+            @test gospn_block(z, an, m, src, dst, "P0") ≈ Matrix(gen_block(an, i, j, trid)) rtol = 1e-12
+        end
+        @test isempty(setdiff(written, visited))
+
+        # And the initial marking is the same one, not merely a marking of some group.
+        ours = initial_vectors(an)
+        for (label, (gid, perm)) in m
+            @test z["init"*label][perm] ≈ ours[gid]
+        end
+    end
+end
+
+check_mrspn("fail/repair", "mrspn_fail_repair.npz", fail_repair())
+check_mrspn("subordinated group", "mrspn_subordinated.npz", subordinated_pair())
+check_mrspn("gen -> imm -> exp", "mrspn_gen_imm_exp.npz", gen_imm_exp())

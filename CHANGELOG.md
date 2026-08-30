@@ -1,3 +1,26 @@
+# PetriAnalysis 0.2.3
+
+- **The MRSPN block matrices are now checked against gospn's** as well as the generator.
+  `test_gospn_crosscheck.jl` reads a `.npz` from `gospn mark` and compares every
+  exponential, immediate and general block, for every pair of regeneration groups, on
+  three nets: the textbook fail/repair, one whose general transition stays enabled across
+  an EXP firing (so its group spans two markings), and one with a vanishing state between
+  the general and exponential transitions. Initial vectors are compared too. They agree
+  to 1e-12, and **no semantic difference was found**.
+
+  Neither the group order nor the marking order agrees between the two implementations,
+  so groups are matched by their *set* of markings and rows by the marking vector. The
+  test also asserts that every block gospn wrote was one the comparison looked at:
+  without that, a name wrong on both sides at once passes, since an absent block reads
+  as zero.
+
+  **Known limitation, and it is gospn's file rather than this test**: a general block is
+  a 0/1 jump matrix, and the result file records neither which general transition each
+  `P<k>` is nor the distribution governing each group. Changing `det(5)` to `det(99)`
+  leaves every matrix in the file identical. The fixtures therefore have exactly one
+  general transition, and what is verified is the *structure* of the regenerative
+  process.
+
 # PetriAnalysis 0.2.2
 
 - **The generator is now checked against gospn's.** The two implement the same

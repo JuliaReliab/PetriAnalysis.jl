@@ -1,0 +1,16 @@
+/*
+  MRSPN crosscheck fixture: the GEN transition stays enabled across an EXP firing, so
+  its regeneration group spans two markings and the subordinated CTMC has a real
+  off-diagonal rate. The Julia side is subordinated_pair().
+*/
+
+place g (init = 1)
+place a (init = 1)
+place b
+
+exp Te (rate = 2.0)
+gen Tg (dist = det(1.0))
+
+arc a to Te
+arc Te to b
+arc g to Tg
