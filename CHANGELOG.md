@@ -1,3 +1,19 @@
+# PetriAnalysis 0.2.2
+
+- **The generator is now checked against gospn's.** The two implement the same
+  semantics twice, in two languages, and nothing compared them.
+  `test/test_gospn_crosscheck.jl` reads a `.npz` written by `gospn mark` and checks
+  that the generator it implies is the one this package builds, for an SPN
+  (`spnp_example1`) and a GSPN whose vanishing states have to be eliminated
+  (`spnp_example2`). They agree to 1e-12.
+
+  The two enumerate the state space in different orders, so nothing can be compared
+  position by position: every comparison is keyed on the marking vector, using the
+  `place` and `mark<G>` elements gospn writes from its 0.20.0. The fixtures and the
+  command that produced them are in `test/data/`.
+
+  NPZ is a test-only dependency; the package itself gains none.
+
 # PetriAnalysis 0.2.1
 
 - `reachability_graph` is substantially faster and allocates less: about 6x the

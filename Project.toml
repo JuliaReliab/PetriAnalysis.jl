@@ -1,6 +1,6 @@
 name = "PetriAnalysis"
 uuid = "829c5846-c182-4980-9194-342f6997dcff"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Hiroyuki Okamura <okamu@hiroshima-u.ac.jp> and contributors"]
 
 [deps]
@@ -18,7 +18,9 @@ SparseArrays = "1"
 julia = "1.10"
 
 [extras]
+# NPZ is test-only: it reads the gospn fixtures the crosscheck compares against.
+NPZ = "15e1cf62-19b3-5cfa-8e77-841668bca605"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["NPZ", "Test"]

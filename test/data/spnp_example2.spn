@@ -1,0 +1,57 @@
+/*
+  SPNP Example 2: Software Performance Analysis
+*/
+
+place p0 (init = 1)
+place p1
+place p2
+place p3
+place p4
+place p5
+place p6
+place p7
+place p8
+
+imm t2 (priority = 1, weight = prob2)
+imm t3 (priority = 1, weight = prob3)
+imm t6 (priority = 1, weight = prob6)
+imm t7 (priority = 1, weight = prob7)
+imm t8 (priority = 1, weight = prob8)
+
+exp A (rate = rate0)
+exp B1 (rate = rate1)
+exp C (rate = rate4)
+exp D (rate = rate5)
+
+iarc p0 to A
+oarc A to p1
+oarc A to p3
+iarc p1 to B1
+oarc B1 to p2
+iarc p3 to t2
+oarc t2 to p4
+iarc p3 to t3
+oarc t3 to p5
+iarc p4 to C
+oarc C to p6
+iarc p5 to D
+oarc D to p7
+iarc p7 to t6
+oarc t6 to p6
+iarc p7 to t7
+oarc t7 to p5
+iarc p2 to t8
+iarc p6 to t8
+oarc t8 to p8
+
+rate0 = 1.0
+rate1 = 0.3
+prob2 = 0.4
+prob3 = 0.6
+rate4 = 0.2
+rate5 = 7.0
+prob6 = 0.05
+prob7 = 0.95
+prob8 = 1.0
+
+reward rfunc #p8
