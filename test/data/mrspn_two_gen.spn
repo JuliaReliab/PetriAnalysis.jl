@@ -1,0 +1,19 @@
+/*
+  MRSPN crosscheck fixture: two independent general transitions with different
+  distributions, so the P<k> block numbering has something to get wrong and the
+  regeneration groups cover several GenVec combinations.
+  The Julia side is two_gen() in test_gospn_crosscheck.jl.
+*/
+
+place a1 (init = 1)
+place b1
+place a2 (init = 1)
+place b2
+
+gen T1 (dist = det(1.0))
+gen T2 (dist = unif(2.0, 4.0))
+
+arc a1 to T1
+arc T1 to b1
+arc a2 to T2
+arc T2 to b2

@@ -14,6 +14,11 @@ marking-dependent rates (`#Pn * lambda`), and `PetriStructure.jl` takes a consta
 so neither can be transcribed. Each `mrspn_*.spn` is the same net as the builder of the
 matching name in `test_mrspn.jl`.
 
+The `mrspn_*.npz` were produced with **gospn 0.22.0 or later**, which is the first that
+writes `gentrans` and `groupgen` — which general transition each `P<k>` block is, and
+what governs each group. Without them a wrong distribution is invisible: a general block
+is a 0/1 jump matrix.
+
 0.20.0 is the first release that writes `place` and `mark<G>`, which is what lets a row
 of a matrix be keyed on its marking -- the two implementations enumerate the state space
 in different orders, so nothing can be compared position by position.

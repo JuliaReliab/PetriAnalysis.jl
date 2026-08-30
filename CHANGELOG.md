@@ -1,3 +1,18 @@
+# PetriAnalysis 0.2.4
+
+- **The MRSPN crosscheck now covers the distributions, not just the block structure.**
+  gospn 0.22.0 records which general transition each `P<k>` block is and what governs
+  each regeneration group (`gentrans`, `groupgen`), which is what the previous version of
+  this test asked for: it compared every block and still passed when `det(5)` was changed
+  to `det(99)`. Both are now compared, and both perturbations fail.
+
+- A fourth fixture, `two_gen`, has **two** general transitions with different
+  distributions — the case where the `P<k>` numbering has something to get wrong
+  (`P0` is `Trebuild` in gospn's `raid6.spn` and `Trecon` in `raid10.spn`). Swapping the
+  two distributions fails the test.
+
+  Requires fixtures from gospn 0.22.0 or later; `test/data/README.md` says so.
+
 # PetriAnalysis 0.2.3
 
 - **The MRSPN block matrices are now checked against gospn's** as well as the generator.
